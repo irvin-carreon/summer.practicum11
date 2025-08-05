@@ -1,0 +1,108 @@
+---
+title: "Logistic Regression"
+author: "Irvin Carreon"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, warning=False}
+library(dplyr)
+library(tidyverse)
+library(readr)
+
+final_dta <- read_csv("D:/Irvin/final_dta.csv")
+
+```
+
+```{r}
+final_dta$operating_airline <- as.factor(final_dta$operating_airline)
+final_dta$origin <- as.factor((final_dta$origin))
+
+final_dta$dep_delay_minutes[is.na(final_dta$dep_delay_minutes)] <- 0
+sum(is.na(final_dta$dep_delay_minutes))
+
+final_dta$crs_dep_hour <- as.factor(final_dta$crs_dep_hour)
+  
+```
+
+
+```{r}
+set.seed(123)
+sample <- sample(c(TRUE,FALSE), nrow(final_dta), replace=TRUE, prob=c(0.7,0.3))
+
+train <- final_dta[sample,]
+test <- final_dta[!sample,]
+```
+
+```{r}
+full_model <- glm(cancelled~operating_airline+origin+dep_delay_minutes+distance+crs_dep_hour, family = binomial(link="logit"), data = train)
+
+empty_model <- glm(cancelled~1, family = binomial(link="logit"), data = train)
+```
+```{r}
+summary(full_model)
+```
+```{r}
+pchisq(log(1171549), 1, lower.tail = FALSE)
+
+```
+
+```{r}
+odds_ratios_again <- exp(coef(full_model))
+print(odds_ratios_again)
+
+
+
+```
+
+```{r}
+step.model <- step(empty_model, scope = list(lower=empty_model,upper=full_model), direction="both", k=2)
+```
+
+```{r}
+summary(step.model)
+```
+
+```{r}
+odds_ratios_main <- exp(coef(step.model))
+print(odds_ratios_main)
+```
+
+```{r}
+interaction_model <- glm(cancelled~(operating_airline*origin) + operating_airline+origin+dep_delay+distance+crs_dep_hour, family = binomial(link="logit"), data = train)
+
+summary(interaction_model)
+```
+
+```{r}
+odds_ratios <- exp(coef(interaction_model))
+print(odds_ratios)
+```
+
+```{r}
+final_dta$dep_del15 <- as.factor(final_dta$dep_del15)
+
+
+full_model_dep <- glm(dep_del15~operating_airline+origin+distance+crs_dep_hour, family = binomial(link="logit"), data = train)
+
+empty_model_dep <- glm(dep_del15~1, family = binomial(link="logit"), data = train)
+```
+
+```{r}
+step.model_dep <- step(empty_model_dep, scope = list(lower=empty_model_dep,upper=full_model_dep), direction="both", k=2)
+```
+```{r}
+summary(step.model_dep)
+```
+```{r}
+odds_ratios_dep <- exp(coef(step.model_dep))
+print(odds_ratios_dep)
+
+
+```
+
+

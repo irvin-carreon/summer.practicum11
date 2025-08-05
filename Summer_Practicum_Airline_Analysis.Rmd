@@ -1,0 +1,178 @@
+---
+title: "Summer Practicum Airline Analysis"
+author: "Sanchita Mahapatra"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r warning=FALSE, message=FALSE}
+library(dplyr)
+library(tidyverse)
+library(readr)
+install.packages("car")
+library(car)
+library(ggplot2)
+library(dplyr)
+library(forcats)
+library(showtext)
+library(survival)
+
+showtext_auto()
+font_add_google(name = "Montserrat", family = "montserrat")
+
+
+final_dta <- read_csv("D:/Sanchita/final_dta.csv")
+```
+
+
+```{r}
+final_dta$operating_airline <- as.factor(final_dta$operating_airline)
+final_dta$origin <- as.factor((final_dta$origin))
+
+final_dta$dep_delay_minutes[is.na(final_dta$dep_delay_minutes)] <- 0
+sum(is.na(final_dta$dep_delay_minutes))
+
+final_dta$crs_dep_hour <- as.factor(final_dta$crs_dep_hour)
+
+
+cancel_codes <- final_dta %>%
+  filter(!is.na(cancellation_code)) %>%
+  group_by(origin, cancellation_code) %>%
+  summarize(count = n())
+cancel_codes <- cancel_codes %>%
+  mutate(cancellation_code = dplyr::recode(cancellation_code,
+                                           "A" = "Carrier",
+                                           "B" = "Weather",
+                                           "C" = "National Air System",
+                                           "D" = "Security"
+  ))
+
+total_by_origin <- cancel_codes %>%
+  group_by(origin) %>%
+  summarise(total=sum(count), .groups="drop")
+
+cancel_codes <- cancel_codes %>%
+  left_join(total_by_origin, by="origin") %>%
+  mutate(cancel_rate=count/total)
+
+
+c1 = "#81a2b3"
+c2 = "#0e2a47ff"
+
+colors1 <- c("MCO"="#81a2b3", "ATL"="#0e2a47ff")
+colors2 <- c("DFW"="#81a2b3", "ATL"="#0e2a47ff")
+colors3 <- c("ORD"="#81a2b3", "ATL"="#0e2a47ff")
+colors4 <- c("MIA"="#81a2b3", "ATL"="#0e2a47ff")
+colors5 <- c("UA"="#81a2b3", "AA"="#0e2a47ff")
+
+cancel_codes_airline <- final_dta %>%
+  filter(!is.na(cancellation_code)) %>%
+  group_by(operating_airline, cancellation_code) %>%
+  summarize(count = n())
+cancel_codes_airline <- cancel_codes_airline %>%
+  mutate(cancellation_code = dplyr::recode(cancellation_code,
+                                           "A" = "Carrier",
+                                           "B" = "Weather",
+                                           "C" = "National Air System",
+                                           "D" = "Security"
+  ))
+
+total_by_airline <- cancel_codes_airline %>%
+  group_by(operating_airline) %>%
+  summarise(total=sum(count), .groups="drop")
+
+cancel_codes_airline <- cancel_codes_airline %>%
+  left_join(total_by_airline, by="operating_airline") %>%
+  mutate(cancel_rate=count/total)
+
+cancel_airline <- cancel_codes_airline %>%
+  filter(operating_airline %in% c("AA", "UA")) %>%
+  filter(cancellation_code %in% c("Weather", "Carrier", "National Air System"))
+
+ggplot(data = cancel_airline, aes(x=fct_reorder(cancellation_code, count, .desc = TRUE), y=cancel_rate, fill=operating_airline)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_manual(name="Airline", values=colors5) +
+  xlab("Cancellation Type") +
+  ylab("Cancellation Rate") +
+  ggtitle("Cancellation Rate for United and American Airlines") +
+  theme_minimal(base_family = "montserrat", base_size = 10) +
+  theme(
+    panel.grid.major.x = element_blank(), 
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 18),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    legend.text = element_text(size = 12),
+    legend.title = element_text(size = 12)) +
+  theme(plot.title = element_text(hjust=0.5))
+```
+```{r}
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(forcats)
+colors6 <- c("AA" = "#81a2b3",   
+             "UA" = "#0e2a47")
+
+# Step 1: Ensure 'flight_date' column exists and is of Date type
+final_dta <- final_dta %>%
+  mutate(flight_date = as.Date(flight_date))  # replace with correct date column if needed
+
+# Step 2: Filter valid cancellations
+cancel_monthly <- final_dta %>%
+  filter(!is.na(cancellation_code)) %>%
+  filter(cancellation_code %in% c("A", "B", "C", "D")) %>%
+  filter(operating_airline %in% c("AA", "UA")) %>%
+  mutate(month = floor_date(flight_date, unit = "month"))  # create monthly column
+
+# Step 3: Count cancelled flights by month and airline
+cancel_counts <- cancel_monthly %>%
+  group_by(operating_airline, month) %>%
+  summarise(cancelled = n(), .groups = "drop")
+
+# Step 4: Count total flights by month and airline (including non-cancelled)
+total_counts <- final_dta %>%
+  filter(operating_airline %in% c("AA", "UA")) %>%
+  mutate(month = floor_date(flight_date, unit = "month")) %>%
+  group_by(operating_airline, month) %>%
+  summarise(total = n(), .groups = "drop")
+
+# Step 5: Join and calculate cancellation rate
+cancel_rate_data <- cancel_counts %>%
+  left_join(total_counts, by = c("operating_airline", "month")) %>%
+  mutate(cancel_rate = cancelled / total)
+
+# Step 6: Plot line chart of cancellation rate by month
+ggplot(cancel_rate_data, aes(x = month, y = cancel_rate, color = operating_airline)) +
+  geom_line(size = 1) +
+  scale_y_continuous() +
+  scale_color_manual(name="Airline", values=colors6)+
+  scale_x_date(date_labels = "%b %Y", date_breaks = "1 month") +
+  labs(
+    title = "Monthly Cancellation Rate for United and American Airlines",
+    x = "Flight Month",
+    y = "Cancellation Rate",
+    color = "Operating Airline"
+  ) +
+  theme_minimal(base_family = "montserrat", base_size = 12) +
+  theme(
+    panel.grid.major.x = element_blank(), 
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, hjust = 0.5),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    legend.text = element_text(size = 12),
+    legend.title = element_text(size = 12)
+  )
+
+
+```
+
+

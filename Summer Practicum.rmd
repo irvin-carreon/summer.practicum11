@@ -1,0 +1,152 @@
+---
+title: "Summer Practicum"
+author: "Irvin Carreon"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Load Preliminary Data
+```{r}
+# April <- read.csv("D:\\Irvin\\Data\\On_Time_Marketing_Carrier_On_Time_Performance_(Beginning_January_2018)_2022_4.csv")
+# 
+# May <- read.csv("D:\\Irvin\\Data\\On_Time_Marketing_Carrier_On_Time_Performance_(Beginning_January_2018)_2022_5.csv")
+# 
+# June <- read.csv("D:\\Irvin\\Data\\On_Time_Marketing_Carrier_On_Time_Performance_(Beginning_January_2018)_2022_6.csv")
+# 
+# July <- read.csv("D:\\Irvin\\Data\\On_Time_Marketing_Carrier_On_Time_Performance_(Beginning_January_2018)_2022_7.csv")
+# 
+# August <- read.csv("D:\\Irvin\\Data\\On_Time_Marketing_Carrier_On_Time_Performance_(Beginning_January_2018)_2022_8.csv")
+# 
+# September <- read.csv("D:\\Irvin\\Data\\On_Time_Marketing_Carrier_On_Time_Performance_(Beginning_January_2018)_2022_9.csv")
+# 
+# October <- read.csv("D:\\Irvin\\Data\\On_Time_Marketing_Carrier_On_Time_Performance_(Beginning_January_2018)_2022_10.csv")
+# 
+# November <- read.csv("D:\\Irvin\\Data\\On_Time_Marketing_Carrier_On_Time_Performance_(Beginning_January_2018)_2022_11.csv")
+# 
+# December <- read.csv("D:\\Irvin\\Data\\On_Time_Marketing_Carrier_On_Time_Performance_(Beginning_January_2018)_2022_12.csv")
+# 
+# January <- read.csv("D:\\Irvin\\Data\\On_Time_Marketing_Carrier_On_Time_Performance_(Beginning_January_2018)_2023_1.csv")
+# 
+# February <- read.csv("D:\\Irvin\\Data\\On_Time_Marketing_Carrier_On_Time_Performance_(Beginning_January_2018)_2023_2.csv")
+# 
+# March <- read.csv("D:\\Irvin\\Data\\On_Time_Marketing_Carrier_On_Time_Performance_(Beginning_January_2018)_2023_3.csv")
+
+
+```
+
+##Merge Preliminary Data Into One Dataset
+```{r}
+# airline <- rbind(April,May,June,July,August,September,October,November,December,January,February,March)
+# 
+# nrow(write.csv(airline, "airline.csv", row.names = FALSE))
+
+```
+
+##Load Cleaned DataSet (Done Separately by Teammate)
+```{r}
+airline <- read.csv("D:\\Irvin\\airline_data_clean.csv")
+```
+
+##Import Packages
+```{r, message=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyverse)
+```
+
+
+##Create Categorical Variables
+```{r}
+airline$quarter <- as.factor(airline$quarter)
+airline$month <- as.factor(airline$month)
+airline$year <- as.factor(airline$year)
+airline$origin <- as.factor(airline$origin)
+airline$operating_airline <- as.factor(airline$operating_airline)
+airline$week_number <- as.numeric(airline$week_number)
+airline$cancelled <- as.numeric(airline$cancelled)
+```
+
+
+##Filter Data For Top 10 US Airports and Top 10 US Airlines
+```{r}
+top_ports_lines <- airline %>%
+  filter(origin %in% c("ATL","DFW","DEN", "ORD","LAX","CLT","MCO","LAS","PHX","MIA")) %>%
+  droplevels() %>%
+  filter(operating_airline %in% c("AA","DL","UA","WN","AS","B6","NK","F9","G4","HA")) %>%
+  droplevels()
+
+
+
+write.csv(top_ports_lines, "top_ports_lines.csv", row.names = FALSE)
+
+```
+
+
+##Calculate Number of Flights For Each Aiport Across Each Week
+```{r}
+total_flights_weekly <- top_ports_lines %>%
+  group_by(origin, week_number) %>%
+  summarise(num_flights=n()) %>%
+  arrange(desc(num_flights))
+
+##Atlanta, Denver, and Dallas airports have the most originating flights across the entire year.
+head(total_flights)
+
+```
+
+
+```{r}
+p_total_flights <- ggplot(total_flights_weekly, aes(x=week_number,y=num_flights,color=origin))+
+  geom_line()
+
+p_total_flights
+```
+
+
+##Calculate Flight Cancellations at Each Airport Each Week
+```{r}
+weekly_cancelation <- top_ports_lines %>%
+  group_by(origin, week_number) %>%
+  summarise(cancelled_flights = sum(cancelled)) %>%
+  arrange(desc(cancelled_flights))
+
+##Atlanta airport has the most weeks weeks with the most cancellations
+head(weekly_cancelation)
+```
+
+
+```{r,message=FALSE}
+weekly_cancelation_atl <- top_ports_lines %>%
+  group_by(origin, week_number) %>%
+  summarise(cancelled_flights = sum(cancelled)) %>%
+  filter(origin=="ATL") %>%
+  arrange(desc(cancelled_flights))
+
+
+p_cancel_atl <- ggplot(weekly_cancelation_atl,aes(x=week_number,y=cancelled_flights)) +
+  geom_line(color="red") +
+  xlab("Week") +
+  ylab("Number of Cancelations") +
+  ggtitle("Number of Flight Cancelations in ATL Airport")
+
+p_cancel_total <- ggplot(weekly_cancelation,aes(x=week_number,y=cancelled_flights,color=origin)) +
+  geom_line() +
+  xlab("Week") +
+  ylab("Number of Cancelations") +
+  ggtitle("Number of Flight Cancelations in Top 10 US Airports")
+
+p_cancel_atl
+p_cancel_total
+
+```
+
+```{r}
+
+```
+
+
+

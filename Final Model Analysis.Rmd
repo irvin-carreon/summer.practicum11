@@ -1,0 +1,214 @@
+---
+title: "Final Model Analysis"
+author: "Kimberly Kiepek"
+date: "2025-07-16"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, warning=False, message = FALSE}
+#import necessary libraries
+library(dplyr)
+library(tidyverse)
+library(readr)
+
+#read in the data
+final_dta <- read_csv("D:/Kimberly/final_dta.csv")
+```
+
+```{r}
+#setting categorical variables as.factor()
+final_dta$operating_airline <- as.factor(final_dta$operating_airline)
+final_dta$origin <- as.factor((final_dta$origin))
+
+final_dta$dep_delay_minutes[is.na(final_dta$dep_delay_minutes)] <- 0
+sum(is.na(final_dta$dep_delay_minutes))
+
+final_dta$crs_dep_hour <- as.factor(final_dta$crs_dep_hour)
+```
+```{r}
+#performing train-test split
+set.seed(123)
+sample <- sample(c(TRUE,FALSE), nrow(final_dta), replace=TRUE, prob=c(0.7,0.3))
+
+train <- final_dta[sample,]
+test <- final_dta[!sample,]
+```
+
+```{r}
+#final model
+model <- glm(cancelled~operating_airline+origin+dep_delay_minutes+distance+crs_dep_hour, family = binomial(link="logit"), data = train)
+summary(model)
+```
+
+```{r}
+#find appropriate p-value for large dataset
+pchisq(log(1171549), 1, lower.tail = FALSE)
+```
+
+```{r}
+#calculate odds_ratios
+odds_ratios <- exp(coef(model))
+print(odds_ratios)
+```
+```{r}
+#checking for multicollinearity
+library(car)
+vif(model)
+```
+```{r}
+#odds ratios
+distance_odds <- data.frame(crs_dep_hour = c(5, 6, 7, 8, 9, 10, 11, 12, 13, 14), odds = c(.506, .582, .561, .556, .521, .593, .548, .676, .666, .727))
+
+distance_odds_2 <- data.frame(crs_dep_hour = c(22, 23), odds = c(1.36, 1.27))
+```
+
+```{r}
+#odds ratios of morning and early afternoon flight cancellation
+library(ggplot2)
+ggplot(distance_odds, aes(x = crs_dep_hour, y = odds)) +
+  geom_col(fill = "#0e2a47ff") + 
+  scale_x_continuous(breaks = seq(min(distance_odds$crs_dep_hour), max(distance_odds$crs_dep_hour), by = 1)) +
+  scale_y_continuous(limits = c(0, 0.8)) +
+  labs(title = "Odds Ratios of Morning and Early Afternoon Flight Cancellation",
+       x = "Departure Hour",
+       y = "Cancellation Odds Ratios") + 
+  theme_minimal(base_family = "montserrat", base_size = 12) +
+  theme(
+    panel.grid.major.x = element_blank(), 
+    panel.grid.minor = element_blank(),
+    legend.position = "bottom",
+    plot.title = element_text(size = 22),
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 16),
+    legend.text = element_text(size = 16),
+    legend.title = element_text(size = 16)
+  )
+```
+```{r}
+#odds of late evening flight cancellation
+ggplot(distance_odds_2, aes(x = crs_dep_hour, y = odds)) +
+  geom_col(fill = "#0e2a47ff") + 
+  scale_x_continuous(breaks = seq(min(distance_odds_2$crs_dep_hour), max(distance_odds_2$crs_dep_hour), by = 1)) +
+  labs(title = "Odds of Late Evening Flights Cancelling",
+       x = "Departure Hour",
+       y = "Cancellation Odds") + 
+  theme_minimal() + 
+  theme(
+    panel.grid.major.x = element_blank(), 
+    panel.grid.minor = element_blank()   
+  )
+```
+
+
+
+```{r}
+#frequency of each cancellation code
+table(final_dta$cancellation_code)
+```
+```{r}
+#number of cancelled flights with no cancellation code = 0
+final_dta %>%
+  filter(cancelled == 1) %>% 
+  filter(is.na(cancellation_code)) %>%
+  group_by(cancellation_code) %>% 
+  summarize(count = n())
+```
+
+
+```{r}
+#recode cancellation codes
+cancel_codes <- final_dta %>%
+  filter(!is.na(cancellation_code)) %>%
+  group_by(crs_dep_hour, cancellation_code) %>% 
+  summarize(count = n())
+cancel_codes <- cancel_codes %>%
+  mutate(cancellation_code = dplyr::recode(cancellation_code,
+    "A" = "Carrier",
+    "B" = "Weather",
+    "C" = "National Air System",
+    "D" = "Security"
+  ))
+print(cancel_codes)
+```
+```{r}
+#cancellation by type at 10:00 PM
+hour_to_plot <- 22
+filtered_df <- subset(cancel_codes, crs_dep_hour == hour_to_plot)
+
+ggplot(filtered_df, aes(x = fct_reorder(cancellation_code, count, .desc = TRUE), y = count)) +
+  geom_bar(stat = "identity") +
+  labs(
+    title = paste("Cancellations by Type at 10:00 PM"),
+    x = "Cancellation Type",
+    y = "Number of Cancellations"
+  ) +
+  theme_minimal()
+```
+```{r}
+#cancellation by type at 11:00 PM
+hour_to_plot <- 23
+filtered_df <- subset(cancel_codes, crs_dep_hour == hour_to_plot)
+
+ggplot(filtered_df, aes(x = fct_reorder(cancellation_code, count, .desc = TRUE), y = count)) +
+  geom_bar(stat = "identity") +
+  labs(
+    title = paste("Cancellations by Type at 10:00 PM"),
+    x = "Cancellation Type",
+    y = "Number of Cancellations"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+#frequency of flights at different departure hours
+table(final_dta$crs_dep_hour)
+```
+```{r}
+#library necessary packages
+library(showtext)
+
+#automatically use showtext for new plots
+showtext_auto()
+
+#add Montserrat font from Google Fonts
+font_add_google(name = "Montserrat", family = "montserrat")
+```
+
+
+```{r}
+#late evening flights by cancellation type
+library(ggplot2)
+library(dplyr)
+library(forcats)
+library(showtext)
+
+showtext_auto()
+font_add_google(name = "Montserrat", family = "montserrat")
+
+filtered_df <- cancel_codes %>%
+  filter(crs_dep_hour %in% c(22, 23))
+
+ggplot(filtered_df, aes(x = fct_reorder(cancellation_code, count, .desc = TRUE), y = count, fill = factor(crs_dep_hour))) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_y_continuous(limits = c(0, 1500)) +
+  scale_fill_manual(values = c("22" = "#81a2b3", "23" = "#0e2a47ff")) +
+  labs(
+    title = "Cancellations by Type for Late Evening Flights",
+    x = "Cancellation Type",
+    y = "Number of Cancellations",
+    fill = "Departure Hour"
+  ) +
+  theme_minimal(base_family = "montserrat", base_size = 14) +
+  theme(
+    panel.grid.major.x = element_blank(), 
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 30),
+    axis.title = element_text(size = 24),
+    axis.text = element_text(size = 20),
+    legend.text = element_text(size = 20),
+    legend.title = element_text(size = 20)
+  )
+```

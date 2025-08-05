@@ -1,0 +1,390 @@
+---
+title: "R_SummerProject2025"
+output: html_document
+---
+
+```{r, error = FALSE, message = false}
+library(tidyverse)
+library(tidymodels)
+library(lubridate)
+library(janitor)
+library(leaps)
+library(glmnet)
+library(MASS)
+library(bestglm)
+library(caret)
+library(boot)
+library(moderndive)
+library(lmtest)
+library(Matrix)
+library(caTools)
+library(showtext)
+```
+
+```{r, eval = FALSE}
+airline_data <- read_csv("final_dta.csv")
+
+set.seed(828)
+
+airline_data$operating_airline <- as.factor(airline_data$operating_airline)
+airline_data$origin <- as.factor(airline_data$origin)
+
+#model <- glm(cancelled ~ origin * operating_airline,
+             #data = airline_data,
+             #family = binomial(link="logit"))
+#summary(model)
+
+glimpse(airline_data)
+```
+
+```{r, eval = FALSE}
+ggplot(data = model, aes(x = .resid, y = .fitted)) +
+  geom_point()
+
+ggplot(data = model, aes(sample = .resid)) + geom_qq() + geom_qq_line()
+```
+
+```{r, eval - FALSE}
+x <- c(42.989494, 49.768385, 6.848527, 0.393594)
+y <- c('Carrier','Weather','NAS','Security')
+
+data <- data.frame(y,x)
+data
+
+
+
+showtext_auto()
+font_add_google(name = "Montserrat", family = "montserrat")
+
+
+ggplot(data, aes(x = x, y = y)) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_fill_manual(values = c("22" = "#ced8df", "23" = "#597581")) +
+  coord_flip() +
+  labs(
+    title = "Cancellations by Type for Late Evening Flights",
+    x = "Cancellation Percentage",
+    y = "Number of Cancellations",
+    fill = "Departure Hour"
+  ) +
+  theme_minimal(base_family = "montserrat", base_size = 14) +
+  theme(
+    panel.grid.major.x = element_blank(), 
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 30),
+    axis.title = element_text(size = 24),
+    axis.text = element_text(size = 20),
+    legend.text = element_text(size = 20),
+    legend.title = element_text(size = 20)
+  )
+```
+
+```{r}
+# Stuff from .Rhistory that I deleted
+
+rlibrary(tidyverse)
+library(tidymodels)
+airline_data <- read.csv("airline.csv")
+glimpse(airline_data)
+nrow(is.na(airline_data$Div3Airport))
+ncol(is.na(airline_data$Div3Airport))
+len(is.na(airline_data$Div3Airport))
+length(is.na(airline_data$Div3Airport))
+sum(is.na(airline_data$Div3Airport))
+library(tidyverse)
+library(tidymodels)
+library(lubridate)
+airline_data <- read.csv("airline.csv")
+min(airline_data$FlightDate)
+max(airline_data$FlightDate)
+start_date <- as.Date("2022-04-01")
+airline_data$Quarter <- as.factor(airline_data$Quarter)
+airline_data$Month <- as.factor(airline_data$Month)
+airline_data$Year <- as.factor(airline_data$Year)
+airline_data$Origin <- as.factor(airline_data$Origin)
+airline_data_cleaner <- airline_data |>
+  select(-c(96:120)) |>
+  mutate(day_number = as.integer(as.numeric(
+    difftime(FlightDate, start_date, units = "days")
+  )))
+airline_data_cleaner$day_number <- as.factor(airline_data$day_number)
+glimpse(airline_data_cleaner)
+levels(airline_data_cleaner$day_number)
+start_date <- as.Date("2022-04-01")
+airline_data$Quarter <- as.factor(airline_data$Quarter)
+start_date <- as.Date("2022-04-01")
+airline_data$Quarter <- as.factor(airline_data$Quarter)
+library(tidyverse)
+library(tidymodels)
+library(lubridate)
+airline_data <- read.csv("airline.csv")
+#min(airline_data$FlightDate)
+#max(airline_data$FlightDate)
+start_date <- as.Date("2022-04-01")
+airline_data$Quarter <- as.factor(airline_data$Quarter)
+airline_data$Month <- as.factor(airline_data$Month)
+airline_data$Year <- as.factor(airline_data$Year)
+airline_data_cleaner <- airline_data |>
+  select(-c(96:120)) |>
+  select(-Div3Airport) |>
+  select(
+    -c(
+      Originally_Scheduled_Code_Share_Airline,
+      IATA_Code_Originally_Scheduled_Code_Share_Airline,
+      DOT_ID_Originally_Scheduled_Code_Share_Airline,
+      Flight_Num_Originally_Scheduled_Code_Share_Airline
+    )
+  ) |>
+  select(-c(71:90)) |>
+  mutate(day_number = as.integer(as.numeric(
+    difftime(FlightDate, start_date, units = "days")
+  )))
+glimpse(airline_data_cleaner)
+glimpse(airline_data_cleaner)
+start_date <- as.Date("2022-04-01")
+airline_data$Quarter <- as.factor(airline_data$Quarter)
+airline_data$Month <- as.factor(airline_data$Month)
+airline_data$Year <- as.factor(airline_data$Year)
+airline_data_cleaner <- airline_data |>
+  select(-c(96:120)) |>
+  select(-Div3Airport) |>
+  select(
+    -c(
+      Originally_Scheduled_Code_Share_Airline,
+      IATA_Code_Originally_Scheduled_Code_Share_Airline,
+      DOT_ID_Originally_Scheduled_Code_Share_Airline,
+      Flight_Num_Originally_Scheduled_Code_Share_Airline
+    )
+  ) |>
+  select(-c(71:90)) |>
+  select(-c(FirstDepTime, TotalAddGTime, LongestAddGTime))
+mutate(day_number = as.integer(as.numeric(
+  difftime(FlightDate, start_date, units = "days")
+)))
+start_date <- as.Date("2022-04-01")
+airline_data$Quarter <- as.factor(airline_data$Quarter)
+airline_data$Month <- as.factor(airline_data$Month)
+airline_data$Year <- as.factor(airline_data$Year)
+airline_data_cleaner <- airline_data |>
+  select(-c(96:120)) |>
+  select(-Div3Airport) |>
+  select(
+    -c(
+      Originally_Scheduled_Code_Share_Airline,
+      IATA_Code_Originally_Scheduled_Code_Share_Airline,
+      DOT_ID_Originally_Scheduled_Code_Share_Airline,
+      Flight_Num_Originally_Scheduled_Code_Share_Airline
+    )
+  ) |>
+  select(-c(71:90)) |>
+  select(-c(FirstDepTime, TotalAddGTime, LongestAddGTime))
+mutate(day_number = as.integer(as.numeric(
+  difftime(FlightDate, start_date, units = "days")
+)))
+airline_data <- read.csv("airline.csv")
+start_date <- as.Date("2022-04-01")
+airline_data$Quarter <- as.factor(airline_data$Quarter)
+airline_data$Month <- as.factor(airline_data$Month)
+airline_data$Year <- as.factor(airline_data$Year)
+airline_data_cleaner <- airline_data |>
+  select(-c(96:120)) |>
+  select(-Div3Airport) |>
+  select(
+    -c(
+      Originally_Scheduled_Code_Share_Airline,
+      IATA_Code_Originally_Scheduled_Code_Share_Airline,
+      DOT_ID_Originally_Scheduled_Code_Share_Airline,
+      Flight_Num_Originally_Scheduled_Code_Share_Airline
+    )
+  ) |>
+  select(-c(71:90)) |>
+  select(-c(FirstDepTime, TotalAddGTime, LongestAddGTime))
+mutate(day_number = as.integer(as.numeric(
+  difftime(FlightDate, start_date, units = "days")
+)))
+start_date <- as.Date("2022-04-01")
+airline_data$Quarter <- as.factor(airline_data$Quarter)
+airline_data$Month <- as.factor(airline_data$Month)
+airline_data$Year <- as.factor(airline_data$Year)
+airline_data_cleaner <- airline_data |>
+  select(-c(96:120)) |>
+  select(-Div3Airport) |>
+  select(
+    -c(
+      Originally_Scheduled_Code_Share_Airline,
+      IATA_Code_Originally_Scheduled_Code_Share_Airline,
+      DOT_ID_Originally_Scheduled_Code_Share_Airline,
+      Flight_Num_Originally_Scheduled_Code_Share_Airline
+    )
+  ) |>
+  select(-c(71:90)) |>
+  select(-c(FirstDepTime, TotalAddGTime, LongestAddGTime)) |>
+  mutate(day_number = as.integer(as.numeric(
+    difftime(FlightDate, start_date, units = "days")
+  )))
+glimpse(airline_data_cleaner)
+library(tidyverse)
+library(tidymodels)
+library(lubridate)
+airline_data <- read.csv("airline.csv")
+#min(airline_data$FlightDate)
+#max(airline_data$FlightDate)
+start_date <- as.Date("2022-04-01")
+airline_data$Quarter <- as.factor(airline_data$Quarter)
+airline_data$Month <- as.factor(airline_data$Month)
+airline_data$Year <- as.factor(airline_data$Year)
+airline_data_cleaner <- airline_data |>
+  select(-c(96:120)) |>
+  select(-Div3Airport) |>
+  select(
+    -c(
+      Originally_Scheduled_Code_Share_Airline,
+      IATA_Code_Originally_Scheduled_Code_Share_Airline,
+      DOT_ID_Originally_Scheduled_Code_Share_Airline,
+      Flight_Num_Originally_Scheduled_Code_Share_Airline
+    )
+  ) |>
+  select(-c(71:90)) |>
+  select(-c(FirstDepTime, TotalAddGTime, LongestAddGTime)) |>
+  mutate(day_number = as.integer(as.numeric(
+    difftime(FlightDate, start_date, units = "days")
+  ))) |>
+  mutate(week_number = as.integer(as.numeric(
+    difftime(FlightDate, start_date, units = "weeks")
+  ))) |>
+  mutate(CancellationCode = na_if(CancellationCode, "")) |>
+  mutate(CancellationCode = as.factor(CancellationCode))
+glimpse(airline_data_cleaner)
+library(tidyverse)
+library(tidymodels)
+library(lubridate)
+library(janitor)
+airline_data <- read.csv("airline.csv")
+#min(airline_data$FlightDate)
+#max(airline_data$FlightDate)
+start_date <- as.Date("2022-04-01")
+airline_data$Quarter <- as.factor(airline_data$Quarter)
+airline_data$Month <- as.factor(airline_data$Month)
+airline_data$Year <- as.factor(airline_data$Year)
+airline_data_cleaner <- airline_data |>
+  select(-c(96:120)) |>
+  select(-Div3Airport) |>
+  select(
+    -c(
+      Originally_Scheduled_Code_Share_Airline,
+      IATA_Code_Originally_Scheduled_Code_Share_Airline,
+      DOT_ID_Originally_Scheduled_Code_Share_Airline,
+      Flight_Num_Originally_Scheduled_Code_Share_Airline
+    )
+  ) |>
+  select(-c(71:90)) |>
+  select(-c(FirstDepTime, TotalAddGTime, LongestAddGTime)) |>
+  mutate(day_number = as.integer(as.numeric(
+    difftime(FlightDate, start_date, units = "days")
+  ))) |>
+  mutate(week_number = as.integer(as.numeric(
+    difftime(FlightDate, start_date, units = "weeks")
+  ))) |>
+  mutate(CancellationCode = na_if(CancellationCode, "")) |>
+  mutate(CancellationCode = as.factor(CancellationCode)) |>
+  #filter(Operating_Airline. %in% c("ATL", "DFW", "DEN", "ORD", "LAX", "CLT", "MCO", "LAS", "PHX", "MIA")) |>
+  #filter(Origin %in% c("ATL", "DFW", "DEN", "ORD", "LAX", "CLT", "MCO", "LAS", "PHX", "MIA")) |>
+  clean_names() #optional
+write.csv(airline_data_cleaner, "airline_data_clean.csv", row.names = FALSE)
+glimpse(airline_data_cleaner)
+airline_data <- read_csv("top_ports_lines.csv")
+library(tidyverse)
+library(tidymodels)
+library(lubridate)
+library(janitor)
+library(leaps)
+library(glmnet)
+library(MASS)
+library(bestglm)
+airline_data <- read_csv("top_ports_lines.csv")
+glimpse(airline_data)
+airline_data <- read_csv("top_ports_lines.csv")
+glimpse(airline_data)
+#regsubsets()
+airline_data <- read_csv("top_ports_lines.csv")
+glimpse(airline_data)
+split <- sample.split(airline_data$dep_delay, SplitRatio = 0.7)
+airline_data <- read_csv("top_ports_lines.csv")
+glimpse(airline_data)
+split <- sample.split(airline_data$dep_delay, SplitRatio = 0.7)
+library(tidyverse)
+library(tidymodels)
+library(lubridate)
+library(janitor)
+library(leaps)
+library(glmnet)
+library(MASS)
+library(bestglm)
+library(caret)
+library(boot)
+library(moderndive)
+library(lmtest)
+library(Matrix)
+library(caTools)
+airline_data <- read_csv("top_ports_lines.csv")
+glimpse(airline_data)
+split <- sample.split(airline_data$dep_delay, SplitRatio = 0.7)
+train <- subset(airline_data, split == TRUE)
+test <- subset(airline_data, split == FALSE)
+mod <- regsubsets(dep_delay ~ ., train)
+airline_data <- read_csv("top_ports_lines.csv")
+airline_data <- read_csv("top_ports_lines.csv")
+airline_data <- airline_data |>
+  select(
+    -c(
+      dest_city_name,
+      origin_city_name,
+      tail_number,
+      iata_code_marketing_airline,
+      operated_or_branded_code_share_partners,
+      dot_id_marketing_airline,
+      flight_date
+    )
+  )
+airline_data <- read_csv("top_ports_lines.csv")
+airline_data <- airline_data |>
+  select(
+    -(
+      dest_city_name,
+      origin_city_name,
+      tail_number,
+      iata_code_marketing_airline,
+      operated_or_branded_code_share_partners,
+      dot_id_marketing_airline,
+      flight_date
+    )
+  )
+airline_data <- read_csv("top_ports_lines.csv")
+airline_data <- airline_data |>
+  select(
+    -c(
+      dest_city_name,
+      origin_city_name,
+      tail_number,
+      iata_code_marketing_airline,
+      operated_or_branded_code_share_partners,
+      dot_id_marketing_airline,
+      flight_date
+    )
+  )
+airline_data <- read_csv("top_ports_lines.csv")
+airline_data <- airline_data |>
+  select(
+    -c(
+      dest_city_name,
+      origin_city_name,
+      tail_number,
+      iata_code_marketing_airline,
+      operated_or_branded_code_share_partners,
+      dot_id_marketing_airline,
+      flight_date
+    )
+  )
+
+```
+
