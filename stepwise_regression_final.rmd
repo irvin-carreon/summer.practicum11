@@ -1,0 +1,548 @@
+---
+title: "Logistic Regression"
+author: "Irvin Carreon"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r warning=FALSE, message=FALSE}
+library(dplyr)
+library(tidyverse)
+library(readr)
+library(car)
+library(car)
+library(ggplot2)
+library(dplyr)
+library(forcats)
+library(showtext)
+library(survival)
+
+showtext_auto()
+font_add_google(name = "Montserrat", family = "montserrat")
+
+
+final_dta <- read_csv("D:/Irvin/final_dta.csv")
+
+```
+
+```{r}
+final_dta$operating_airline <- as.factor(final_dta$operating_airline)
+final_dta$origin <- as.factor((final_dta$origin))
+
+final_dta$dep_delay_minutes[is.na(final_dta$dep_delay_minutes)] <- 0
+sum(is.na(final_dta$dep_delay_minutes))
+
+final_dta$crs_dep_hour <- as.factor(final_dta$crs_dep_hour)
+
+
+cancel_codes <- final_dta %>%
+  filter(!is.na(cancellation_code)) %>%
+  group_by(origin, cancellation_code) %>%
+  summarize(count = n())
+cancel_codes <- cancel_codes %>%
+  mutate(cancellation_code = dplyr::recode(cancellation_code,
+    "A" = "Carrier",
+    "B" = "Weather",
+    "C" = "National Air System",
+    "D" = "Security"
+  ))
+
+total_by_origin <- cancel_codes %>%
+  group_by(origin) %>%
+  summarise(total=sum(count), .groups="drop")
+
+cancel_codes <- cancel_codes %>%
+  left_join(total_by_origin, by="origin") %>%
+  mutate(cancel_rate=count/total)
+
+
+c1 = "#81a2b3"
+c2 = "#0e2a47ff"
+
+colors1 <- c("MCO"="#81a2b3", "ATL"="#0e2a47ff")
+colors2 <- c("DFW"="#81a2b3", "ATL"="#0e2a47ff")
+colors3 <- c("ORD"="#81a2b3", "ATL"="#0e2a47ff")
+colors4 <- c("MIA"="#81a2b3", "ATL"="#0e2a47ff")
+colors5 <- c("UA"="#81a2b3", "AA"="#0e2a47ff")
+  
+```
+
+
+
+AIRLINE
+```{r}
+
+cancel_codes_airline <- final_dta %>%
+  filter(!is.na(cancellation_code)) %>%
+  group_by(operating_airline, cancellation_code) %>%
+  summarize(count = n())
+cancel_codes_airline <- cancel_codes_airline %>%
+  mutate(cancellation_code = dplyr::recode(cancellation_code,
+    "A" = "Carrier",
+    "B" = "Weather",
+    "C" = "National Air System",
+    "D" = "Security"
+  ))
+
+total_by_airline <- cancel_codes_airline %>%
+  group_by(operating_airline) %>%
+  summarise(total=sum(count), .groups="drop")
+
+cancel_codes_airline <- cancel_codes_airline %>%
+  left_join(total_by_airline, by="operating_airline") %>%
+  mutate(cancel_rate=count/total)
+
+cancel_airline <- cancel_codes_airline %>%
+  filter(operating_airline %in% c("AA", "UA")) %>%
+  filter(cancellation_code %in% c("Weather", "Carrier", "National Air System"))
+
+ggplot(data = cancel_airline, aes(x=fct_reorder(cancellation_code, count, .desc = TRUE), y=cancel_rate, fill=operating_airline)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_manual(name="Airline", values=colors5) +
+  xlab("Cancellation Type") +
+  ylab("Cancellation Rate") +
+  ggtitle("Cancellation Rate for United and American Airlines") +
+  theme_minimal(base_family = "montserrat", base_size = 10) +
+  theme(
+    panel.grid.major.x = element_blank(), 
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 18),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    legend.text = element_text(size = 12),
+    legend.title = element_text(size = 12)) +
+   theme(plot.title = element_text(hjust=0.5))
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(forcats)
+
+# Step 1: Ensure 'flight_date' column exists and is of Date type
+final_dta <- final_dta %>%
+  mutate(flight_date = as.Date(flight_date))  # replace with correct date column if needed
+
+# Step 2: Count cancelled flights by month and airline
+cancel_rate_data <- final_dta %>%
+  mutate(month1 = floor_date(flight_date, unit="month")) %>%
+  group_by(operating_airline, month1) %>%
+  summarise(total_flights=n(), cancelled_flights=sum(cancelled==1), .groups='drop') %>%
+  mutate(cancel_rate = cancelled_flights / total_flights) %>%
+  filter(operating_airline %in% c("AA", "UA")) %>%
+  ggplot(aes(x = month1, y = cancel_rate, color=operating_airline)) +
+  geom_smooth(span=0.2, se=FALSE) +
+  scale_color_manual(name="Airline", values=colors5) +
+  labs(
+    title = "Monthly Cancellation Rate for United and American Airlines",
+    x = "Flight Month",
+    y = "Cancellation Rate",
+    color = "Operating Airline"
+  ) +
+  theme_minimal(base_family = "montserrat", base_size = 12) +
+  theme(panel.grid.major.x = element_blank(), 
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 18, hjust = 0.5),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    legend.text = element_text(size = 12),
+    legend.title = element_text(size = 12)
+  )
+
+cancel_rate_data
+
+```
+
+```{r}
+set.seed(123)
+sample <- sample(c(TRUE,FALSE), nrow(final_dta), replace=TRUE, prob=c(0.7,0.3))
+
+train <- final_dta[sample,]
+test <- final_dta[!sample,]
+```
+
+```{r}
+full_model <- glm(cancelled~operating_airline+origin+dep_delay_minutes+distance+crs_dep_hour, family = binomial(link="logit"), data = train)
+
+final_model <- glm(cancelled~operating_airline+origin+dep_delay_minutes+distance+crs_dep_hour, family = binomial(link="logit"), data = test)
+
+survival::concordance(final_model)
+
+
+#empty_model <- glm(cancelled~1, family = binomial(link="logit"), data = train)
+```
+
+```{r}
+pchisq(log(1171549), 1, lower.tail = FALSE)
+
+```
+
+```{r}
+step.model <- step(empty_model, scope = list(lower=empty_model,upper=full_model), direction="both", k=2)
+```
+
+```{r}
+vif(step.model)
+```
+
+```{r}
+summary(step.model)
+```
+
+```{r}
+odds_ratios_main <- exp(coef(step.model))
+print(odds_ratios_main)
+```
+```{r}
+
+
+p0 <- ggplot(final_dta, aes(x=fct_infreq(origin))) +
+  geom_bar(fill=c2) +
+  xlab("Airport") +
+  ylab("Number of Flights") +
+  ggtitle("Distribution of Flights from the Top 10 U.S. Airports") +
+  scale_y_continuous(labels = function(x) format(x, scientific=FALSE)) +
+  theme_minimal(base_family = "montserrat", base_size = 10) +
+  theme(
+    panel.grid.major.x = element_blank(), 
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 18),
+    axis.title = element_text(size = 16),
+    axis.text = element_text(size = 14),
+    legend.text = element_text(size = 14),
+    legend.title = element_text(size = 14)) +
+   theme(plot.title = element_text(hjust=0.5))
+
+p0
+```
+
+Taking a deeper dive into MCO airport since its over twice as likely to have a cancelled flight compared to ATL. First filter out observations for only MCO airport.
+
+```{r}
+# mco_dta <- final_dta %>%
+#   filter(origin=="MCO")
+```
+
+```{r}
+# table(mco_dta$cancelled)
+# table(mco_dta$cancellation_code)
+# table(mco_dta$operating_airline)
+```
+```{r}
+# p1 <- ggplot(mco_dta, aes(x=operating_airline)) +
+#   geom_bar(fill="darkblue") +
+#   xlab("Airline") +
+#   ylab("Count") +
+#   ggtitle("Distribution of Operating Airlines in MCO Airport") +
+#   theme_bw() +
+#   guides(fill=guide_legend(title="Airline"))
+# 
+# p1
+```
+```{r}
+# mco_dta %>%
+#   group_by(operating_airline) %>%
+#   summarise(rel_cancelled = mean(cancelled))
+```
+
+```{r}
+# p2 <-  mco_dta %>%
+#   filter(cancelled==1) %>%
+#   count(flight_date) %>%
+#   ggplot(aes(x=flight_date, y=n)) +
+#   geom_line()
+# 
+# p2
+```
+ATL and MCO Comparison
+```{r}
+mco_atl_dta <- final_dta %>%
+  filter(origin=="MCO" | origin == "ATL")
+```
+
+```{r}
+p1 <- mco_atl_dta %>%
+  mutate(week = floor_date(flight_date, unit="week")) %>%
+  group_by(origin,week) %>%
+  summarise(total_flights = n(), cancelled_flights = sum(cancelled==1), .groups = 'drop') %>%
+  mutate(cancel_rate = cancelled_flights/ total_flights) %>%
+  ggplot(aes(x=week, y=cancel_rate, color=origin)) +
+  geom_smooth(span=0.1, se=FALSE) +
+  scale_color_manual(name="Airport", values=colors1) +
+  xlab("Week") +
+  ylab("Cancellation Rate") +
+  ggtitle("Weekly Cancellation Rate for Orlando and Atlanta International Airports") +
+  theme_minimal(base_family = "montserrat", base_size = 10) +
+  theme(
+    panel.grid.major.x = element_blank(), 
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 18),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    legend.text = element_text(size = 12),
+    legend.title = element_text(size = 12)) +
+   theme(plot.title = element_text(hjust=0.5))
+  
+
+p1
+
+```
+
+```{r}
+# mco_cancel <- cancel_codes %>%
+#   group_by(origin)
+#   filter(origin %in% c("ATL", "MCO"))
+```
+
+```{r}
+
+cancel_mco <- cancel_codes %>%
+  filter(origin %in% c("ATL", "MCO")) %>%
+  filter(cancellation_code %in% c("Weather", "Carrier", "National Air System"))
+  
+
+ggplot(data = cancel_mco, aes(x=fct_reorder(cancellation_code, count, .desc = TRUE), y=cancel_rate, fill=origin)) +
+  geom_bar(stat="identity", position = "dodge") +
+  scale_fill_manual(name="Airport", values=colors1) +
+  xlab("Cancellation Type") +
+  ylab("Cancellation Rate") +
+  ggtitle("Cancellation Types for Orlando and Atlanta International Airports") +
+  theme_minimal(base_family = "montserrat", base_size = 10) +
+  theme(
+    panel.grid.major.x = element_blank(), 
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 18),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    legend.text = element_text(size = 12),
+    legend.title = element_text(size = 12)) +
+   theme(plot.title = element_text(hjust=0.5))
+
+```
+
+
+
+
+
+DFW and ATL Comparison
+```{r}
+dfw_atl_dta <- final_dta %>%
+  filter(origin== "DFW" | origin == "ATL")
+```
+
+```{r}
+p4 <-  dfw_atl_dta %>%
+  mutate(week = floor_date(flight_date, unit="week")) %>%
+  group_by(origin,week) %>%
+  summarise(total_flights = n(), cancelled_flights = sum(cancelled==1), .groups = 'drop') %>%
+  mutate(cancel_rate = cancelled_flights/ total_flights) %>%
+  ggplot(aes(x=week, y=cancel_rate, color=origin)) +
+  geom_smooth(span=0.1, se=FALSE) +
+  scale_color_manual(name="Airport", values=colors2) +
+  xlab("Week") +
+  ylab("Cancellation Rate") +
+  ggtitle("Weekly Cancellation Rate for Dallas and Atlanta International Airports") +
+  theme_minimal(base_family = "montserrat", base_size = 10) +
+  theme(
+    panel.grid.major.x = element_blank(), 
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 18),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    legend.text = element_text(size = 12),
+    legend.title = element_text(size = 12)) +
+   theme(plot.title = element_text(hjust=0.5))
+
+  
+
+p4
+```
+
+```{r}
+cancel_dfw <- cancel_codes %>%
+  filter(origin %in% c("ATL", "DFW")) %>%
+  filter(cancellation_code %in% c("Weather", "Carrier", "National Air System"))
+
+ggplot(data = cancel_dfw, aes(x=fct_reorder(cancellation_code, count, .desc = TRUE), y=cancel_rate, fill=origin)) +
+  geom_bar(stat="identity", position = position_dodge()) +
+  scale_fill_manual(name="Airport", values=colors2) +
+  xlab("Cancellation Type") +
+  ylab("Cancellation Rate") +
+  ggtitle("Cancellation Types for Dallas and Atlanta International Airports") +
+  theme_minimal(base_family = "montserrat", base_size = 10) +
+  theme(
+    panel.grid.major.x = element_blank(), 
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 18),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    legend.text = element_text(size = 12),
+    legend.title = element_text(size = 12))
+
+```
+
+
+
+
+
+
+ORD and ATL Comparison
+```{r}
+ord_atl_dta <- final_dta %>%
+  filter(origin== "ORD" | origin == "ATL")
+```
+
+
+```{r}
+p5 <-  ord_atl_dta %>%
+  mutate(week = floor_date(flight_date, unit="week")) %>%
+  group_by(origin,week) %>%
+  summarise(total_flights = n(), cancelled_flights = sum(cancelled==1), .groups = 'drop') %>%
+  mutate(cancel_rate = cancelled_flights/ total_flights) %>%
+  ggplot(aes(x=week, y=cancel_rate, color=origin)) +
+  geom_smooth(span=0.1, se=FALSE) +
+  scale_color_manual(name="Airport", values=colors3) +
+  xlab("Week") +
+  ylab("Cancellation Rate") +
+  ggtitle("Weekly Cancellation Rate for Chicago and Atlanta International Airports") +
+  theme_minimal(base_family = "montserrat", base_size = 10) +
+  theme(
+    panel.grid.major.x = element_blank(), 
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 18),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    legend.text = element_text(size = 12),
+    legend.title = element_text(size = 12)) +
+   theme(plot.title = element_text(hjust=0.5))
+
+  
+
+p5
+```
+
+```{r}
+cancel_ord <- cancel_codes %>%
+  filter(origin %in% c("ATL", "ORD"))
+
+p5_1 <- ggplot(data = cancel_ord, aes(x=fct_reorder(cancellation_code, count, .desc=TRUE), y=cancel_rate, fill=origin)) +
+  geom_bar(stat="identity", position = position_dodge()) +
+  scale_fill_manual(name="Airport", values=colors3) +
+  xlab("Cancellation Type") +
+  ylab("Cancellation Rate") +
+  ggtitle("Cancellation Types for Chicago and Atlanta International Airports") +
+  theme_minimal(base_family = "montserrat", base_size = 10) +
+  theme(
+    panel.grid.major.x = element_blank(), 
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 18),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    legend.text = element_text(size = 12),
+    legend.title = element_text(size = 12))
+
+p5_1
+```
+
+
+MIA and ATL Comparison
+```{r}
+mia_atl_dta <- final_dta %>%
+  filter(origin== "MIA" | origin == "ATL")
+
+p6 <-  mia_atl_dta %>%
+ mutate(week = floor_date(flight_date, unit="week")) %>%
+  group_by(origin,week) %>%
+  summarise(total_flights = n(), cancelled_flights = sum(cancelled==1), .groups = 'drop') %>%
+  mutate(cancel_rate = cancelled_flights/ total_flights) %>%
+  ggplot(aes(x=week, y=cancel_rate, color=origin)) +
+  geom_smooth(span=0.1, se=FALSE) +
+  scale_color_manual(name="Airport", values=colors4) +
+  xlab("Week") +
+  ylab("Cancellation Rate") +
+  ggtitle("Weekly Flight Cancellations for Miami and Atlanta International Airports") +
+  theme_minimal(base_family = "montserrat", base_size = 10) +
+  theme(
+    panel.grid.major.x = element_blank(), 
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 18),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    legend.text = element_text(size = 12),
+    legend.title = element_text(size = 12)) +
+   theme(plot.title = element_text(hjust=0.5))
+  
+
+p6
+```
+
+```{r}
+cancel_mia <- cancel_codes %>%
+  filter(origin %in% c("ATL", "MIA"))
+
+
+ggplot(data = cancel_mia, aes(x=fct_reorder(cancellation_code, count, .desc = TRUE), y=cancel_rate, fill=origin)) +
+  geom_bar(stat="identity", position = position_dodge()) +
+  scale_fill_manual(name="Airport", values = colors4) +
+  xlab("Cancellation Type") +
+  ylab("Cancellation Rate") +
+  ggtitle("Cancellation Types for Miami and Atlanta International Airports") +
+  theme_minimal(base_family = "montserrat", base_size = 10) +
+  theme(
+    panel.grid.major.x = element_blank(), 
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 18),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    legend.text = element_text(size = 12),
+    legend.title = element_text(size = 12))
+  
+
+
+```
+
+
+Interaction Model
+```{r}
+# interaction_model <- glm(cancelled~(operating_airline*origin) + operating_airline+origin+dep_delay+distance+crs_dep_hour, family = binomial(link="logit"), data = train)
+# 
+# summary(interaction_model)
+```
+
+```{r}
+# odds_ratios <- exp(coef(interaction_model))
+# print(odds_ratios)
+```
+
+Attempting to use dep_del15 as the response variable
+```{r}
+# final_dta$dep_del15 <- as.factor(final_dta$dep_del15)
+# 
+# full_model_dep <- glm(dep_del15~operating_airline+origin+distance+crs_dep_hour, family = binomial(link="logit"), data = train)
+# 
+# empty_model_dep <- glm(dep_del15~1, family = binomial(link="logit"), data = train)
+```
+
+```{r}
+# step.model_dep <- step(empty_model_dep, scope = list(lower=empty_model_dep,upper=full_model_dep), direction="both", k=2)
+```
+
+```{r}
+# summary(step.model_dep)
+```
+
+```{r}
+# odds_ratios_dep <- exp(coef(step.model_dep))
+# print(odds_ratios_dep)
+```
+
+```{r}
+# vif(step.model_dep)
+```
+
+
